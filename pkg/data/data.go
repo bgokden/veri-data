@@ -24,6 +24,15 @@ type Data struct {
 	Dirty       bool
 }
 
+// Stats to share about data
+type Stats struct {
+	Avg         []float64
+	N           int64
+	MaxDistance float64
+	Hist        []float64
+	Timestamp   int64
+}
+
 // NewData creates a data struct
 func NewData(name, path string) (*Data, error) {
 	dt := &Data{
@@ -36,7 +45,7 @@ func NewData(name, path string) (*Data, error) {
 		return nil, err
 	}
 	dt.DB = db
-	// go dt.Run()
+	go dt.Run()
 	go func() {
 		sigint := make(chan os.Signal, 1)
 
@@ -148,6 +157,7 @@ func (dt *Data) Process(force bool) error {
 					n++
 					avg = CalculateAverage(avg, datumKey.Feature, nFloat)
 					distance = VectorDistance(dt.Avg, datumKey.Feature)
+
 					if distance > maxDistance {
 						maxDistance = distance
 					}
@@ -174,4 +184,15 @@ func (dt *Data) Process(force bool) error {
 	dt.Timestamp = getCurrentTime() // update always
 	dt.Dirty = false
 	return nil
+}
+
+// Get Stats out of data
+func (dt *Data) GetStats() *Stats {
+	return &Stats{
+		Avg:         dt.Avg,
+		N:           dt.N,
+		MaxDistance: dt.MaxDistance,
+		Hist:        dt.Hist,
+		Timestamp:   dt.Timestamp,
+	}
 }

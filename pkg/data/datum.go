@@ -6,11 +6,13 @@ import (
 	"log"
 )
 
+// Datum is a general feature holder
 type Datum struct {
 	Key   *DatumKey
 	Value *DatumValue
 }
 
+// DatumKey is a key for Datum
 type DatumKey struct {
 	Feature    []float64
 	Dim1       uint32
@@ -20,11 +22,13 @@ type DatumKey struct {
 	GroupLabel string
 }
 
+// DatumValue is value of a Datum
 type DatumValue struct {
-	Label     string
-	Timestamp int64
+	Label   string
+	Version int64
 }
 
+// NewDatum is an utily function to initialize datum type
 func NewDatum(feature []float64,
 	dim1 uint32,
 	dim2 uint32,
@@ -32,7 +36,7 @@ func NewDatum(feature []float64,
 	size2 uint32,
 	groupLabel string,
 	label string,
-	timestamp int64,
+	version int64,
 ) *Datum {
 	return &Datum{
 		Key: &DatumKey{
@@ -44,8 +48,8 @@ func NewDatum(feature []float64,
 			GroupLabel: groupLabel,
 		},
 		Value: &DatumValue{
-			Label:     label,
-			Timestamp: timestamp,
+			Label:   label,
+			Version: version,
 		},
 	}
 }
