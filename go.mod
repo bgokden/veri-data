@@ -1,6 +1,6 @@
 module github.com/bgokden/veri-data
 
-go 1.13
+go 1.15
 
 require (
 	github.com/bgokden/go-kdtree v0.0.0-20181219192024-2e8968891a38
