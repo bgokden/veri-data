@@ -3,7 +3,7 @@ package data_test
 import (
 	"testing"
 
-	data "github.com/bgokden/veri-data/pkg/data"
+	data "github.com/bgokden/veri-data"
 	"github.com/stretchr/testify/assert"
 )
 
