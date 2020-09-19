@@ -34,4 +34,6 @@ func TestData(t *testing.T) {
 	log.Printf("stats %v\n", dt.GetStats())
 
 	assert.Nil(t, err)
+
+	dt.Search(datum)
 }

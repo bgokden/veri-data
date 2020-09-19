@@ -1,14 +1,17 @@
 package data
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 	"time"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
+	bpb "github.com/dgraph-io/badger/v2/pb"
 )
 
 // Data represents a dataset with similar struture
@@ -77,9 +80,93 @@ type TTLOption struct {
 	Duration time.Duration
 }
 
-// Search does a search based on distances of keys
-func (dt *Data) Search(datum Datum, options ...SearchOption) []Datum {
+// Collector collects results
+type Collector struct {
+	List        []RelativeDatum
+	Distance    func(arr1 []float64, arr2 []float64) float64
+	MaxDistance float64
+	DatumKey    *DatumKey
+	N           int
+}
+
+// RelativeDatum helps to keep Data ordered
+type RelativeDatum struct {
+	Datum    *Datum
+	Distance float64
+}
+
+// Senc collects the results
+func (c *Collector) Send(list *bpb.KVList) error {
+	itemAdded := false
+	for _, item := range list.Kv {
+		datumKey, _ := ToDatumKey(item.Key)
+		distance := c.Distance(datumKey.Feature, c.DatumKey.Feature)
+		if len(c.List) < c.N {
+			datum, _ := ToDatum(item.Key, item.Value)
+			relativeDatum := RelativeDatum{
+				Datum:    datum,
+				Distance: distance,
+			}
+			c.List = append(c.List, relativeDatum)
+			itemAdded = true
+		} else if distance < c.List[len(c.List)-1].Distance {
+			datum, _ := ToDatum(item.Key, item.Value)
+			relativeDatum := RelativeDatum{
+				Datum:    datum,
+				Distance: distance,
+			}
+			c.List[len(c.List)-1] = relativeDatum
+			itemAdded = true
+		}
+		if itemAdded {
+			sort.Slice(c.List, func(i, j int) bool {
+				return c.List[i].Distance < c.List[j].Distance
+			})
+			itemAdded = false
+		}
+	}
 	return nil
+}
+
+// Search does a search based on distances of keys
+func (dt *Data) Search(datum *Datum, options ...SearchOption) []RelativeDatum {
+	stream := dt.DB.NewStream()
+	// db.NewStreamAt(readTs) for managed mode.
+
+	// -- Optional settings
+	stream.NumGo = 16                     // Set number of goroutines to use for iteration.
+	stream.Prefix = nil                   // Leave nil for iteration over the whole DB.
+	stream.LogPrefix = "Badger.Streaming" // For identifying stream logs. Outputs to Logger.
+
+	// ChooseKey is called concurrently for every key. If left nil, assumes true by default.
+	stream.ChooseKey = nil
+
+	// KeyToList is called concurrently for chosen keys. This can be used to convert
+	// Badger data into custom key-values. If nil, uses stream.ToList, a default
+	// implementation, which picks all valid key-values.
+	stream.KeyToList = nil
+
+	// -- End of optional settings.
+
+	// Send is called serially, while Stream.Orchestrate is running.
+	c := &Collector{}
+	c.Distance = VectorDistance
+	c.DatumKey = datum.Key
+	c.N = 10
+	stream.Send = c.Send
+
+	// Run the stream
+	if err := stream.Orchestrate(context.Background()); err != nil {
+		return nil
+	}
+	// Done.
+	log.Printf("Result: %v\n", c.List)
+
+	for _, e := range c.List {
+		log.Printf("%v\n", e.Datum.Value.Label)
+	}
+
+	return c.List
 }
 
 // Insert inserts data to internal kv store
@@ -146,7 +233,7 @@ func (dt *Data) Process(force bool) error {
 
 		err := dt.DB.View(func(txn *badger.Txn) error {
 			opts := badger.DefaultIteratorOptions
-			opts.PrefetchSize = 10
+			opts.PrefetchValues = false
 			it := txn.NewIterator(opts)
 			defer it.Close()
 			for it.Rewind(); it.Valid(); it.Next() {
