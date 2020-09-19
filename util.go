@@ -30,6 +30,16 @@ func VectorDistance(arr1 []float64, arr2 []float64) float64 {
 	return d
 }
 
+// VectorMultiplication calculates elementwise of multiplication of two vectors
+func VectorMultiplication(arr1 []float64, arr2 []float64) float64 {
+	minLen := min(len(arr1), len(arr2))
+	var ret float64
+	for i := 0; i < minLen; i++ {
+		ret += arr1[i] * arr2[i]
+	}
+	return ret
+}
+
 func euclideanDistance(arr1 []float64, arr2 []float64) float64 {
 	var ret float64
 	for i := 0; i < len(arr1); i++ {

@@ -35,5 +35,19 @@ func TestData(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	dt.Search(datum)
+	list := dt.Search(datum)
+
+	for _, e := range list {
+		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
+	}
+
+	opt := data.ScoreFuncOption{}
+	opt.ScoreFunc = data.VectorMultiplication
+	opt.HigherIsBetter = true
+	list2 := dt.Search(datum, opt)
+
+	for _, e := range list2 {
+		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
+	}
+
 }

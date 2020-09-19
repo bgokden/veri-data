@@ -80,19 +80,26 @@ type TTLOption struct {
 	Duration time.Duration
 }
 
-// Collector collects results
-type Collector struct {
-	List        []RelativeDatum
-	Distance    func(arr1 []float64, arr2 []float64) float64
-	MaxDistance float64
-	DatumKey    *DatumKey
-	N           int
+// ScoreFuncOption is a search option for custom search functions
+type ScoreFuncOption struct {
+	ScoreFunc      func(arr1 []float64, arr2 []float64) float64
+	HigherIsBetter bool
 }
 
-// RelativeDatum helps to keep Data ordered
-type RelativeDatum struct {
-	Datum    *Datum
-	Distance float64
+// Collector collects results
+type Collector struct {
+	List           []ScoredDatum
+	ScoreFunc      func(arr1 []float64, arr2 []float64) float64
+	MaxScore       float64
+	DatumKey       *DatumKey
+	N              int
+	HigherIsBetter bool
+}
+
+// ScoredDatum helps to keep Data ordered
+type ScoredDatum struct {
+	Datum *Datum
+	Score float64
 }
 
 // Senc collects the results
@@ -100,28 +107,35 @@ func (c *Collector) Send(list *bpb.KVList) error {
 	itemAdded := false
 	for _, item := range list.Kv {
 		datumKey, _ := ToDatumKey(item.Key)
-		distance := c.Distance(datumKey.Feature, c.DatumKey.Feature)
+		score := c.ScoreFunc(datumKey.Feature, c.DatumKey.Feature)
 		if len(c.List) < c.N {
 			datum, _ := ToDatum(item.Key, item.Value)
-			relativeDatum := RelativeDatum{
-				Datum:    datum,
-				Distance: distance,
+			scoredDatum := ScoredDatum{
+				Datum: datum,
+				Score: score,
 			}
-			c.List = append(c.List, relativeDatum)
+			c.List = append(c.List, scoredDatum)
 			itemAdded = true
-		} else if distance < c.List[len(c.List)-1].Distance {
+		} else if (c.HigherIsBetter && score > c.List[len(c.List)-1].Score) ||
+			(!c.HigherIsBetter && score < c.List[len(c.List)-1].Score) {
 			datum, _ := ToDatum(item.Key, item.Value)
-			relativeDatum := RelativeDatum{
-				Datum:    datum,
-				Distance: distance,
+			scoredDatum := ScoredDatum{
+				Datum: datum,
+				Score: score,
 			}
-			c.List[len(c.List)-1] = relativeDatum
+			c.List[len(c.List)-1] = scoredDatum
 			itemAdded = true
 		}
 		if itemAdded {
-			sort.Slice(c.List, func(i, j int) bool {
-				return c.List[i].Distance < c.List[j].Distance
-			})
+			if c.HigherIsBetter {
+				sort.Slice(c.List, func(i, j int) bool {
+					return c.List[i].Score > c.List[j].Score
+				})
+			} else {
+				sort.Slice(c.List, func(i, j int) bool {
+					return c.List[i].Score < c.List[j].Score
+				})
+			}
 			itemAdded = false
 		}
 	}
@@ -129,7 +143,19 @@ func (c *Collector) Send(list *bpb.KVList) error {
 }
 
 // Search does a search based on distances of keys
-func (dt *Data) Search(datum *Datum, options ...SearchOption) []RelativeDatum {
+func (dt *Data) Search(datum *Datum, options ...SearchOption) []ScoredDatum {
+	c := &Collector{}
+	c.ScoreFunc = VectorDistance
+	c.DatumKey = datum.Key
+	c.HigherIsBetter = false
+	c.N = 10
+	for _, val := range options {
+		switch v := val.(type) {
+		case ScoreFuncOption:
+			c.ScoreFunc = v.ScoreFunc
+			c.HigherIsBetter = v.HigherIsBetter
+		}
+	}
 	stream := dt.DB.NewStream()
 	// db.NewStreamAt(readTs) for managed mode.
 
@@ -149,10 +175,7 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) []RelativeDatum {
 	// -- End of optional settings.
 
 	// Send is called serially, while Stream.Orchestrate is running.
-	c := &Collector{}
-	c.Distance = VectorDistance
-	c.DatumKey = datum.Key
-	c.N = 10
+
 	stream.Send = c.Send
 
 	// Run the stream
@@ -160,12 +183,6 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) []RelativeDatum {
 		return nil
 	}
 	// Done.
-	log.Printf("Result: %v\n", c.List)
-
-	for _, e := range c.List {
-		log.Printf("%v\n", e.Datum.Value.Label)
-	}
-
 	return c.List
 }
 
