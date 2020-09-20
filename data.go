@@ -86,13 +86,18 @@ type ScoreFuncOption struct {
 	HigherIsBetter bool
 }
 
+// LimitOption is a search option for limit number of results
+type LimitOption struct {
+	Limit uint32
+}
+
 // Collector collects results
 type Collector struct {
 	List           []ScoredDatum
 	ScoreFunc      func(arr1 []float64, arr2 []float64) float64
 	MaxScore       float64
 	DatumKey       *DatumKey
-	N              int
+	N              uint32
 	HigherIsBetter bool
 }
 
@@ -108,7 +113,7 @@ func (c *Collector) Send(list *bpb.KVList) error {
 	for _, item := range list.Kv {
 		datumKey, _ := ToDatumKey(item.Key)
 		score := c.ScoreFunc(datumKey.Feature, c.DatumKey.Feature)
-		if len(c.List) < c.N {
+		if uint32(len(c.List)) < c.N {
 			datum, _ := ToDatum(item.Key, item.Value)
 			scoredDatum := ScoredDatum{
 				Datum: datum,
@@ -154,6 +159,8 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) []ScoredDatum {
 		case ScoreFuncOption:
 			c.ScoreFunc = v.ScoreFunc
 			c.HigherIsBetter = v.HigherIsBetter
+		case LimitOption:
+			c.N = v.Limit
 		}
 	}
 	stream := dt.DB.NewStream()
