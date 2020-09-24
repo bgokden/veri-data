@@ -24,7 +24,7 @@ type DatumKey struct {
 
 // DatumValue is value of a Datum
 type DatumValue struct {
-	Label   string
+	Label   []byte
 	Version int64
 }
 
@@ -35,7 +35,7 @@ func NewDatum(feature []float64,
 	size1 uint32,
 	size2 uint32,
 	groupLabel string,
-	label string,
+	label []byte,
 	version int64,
 ) *Datum {
 	return &Datum{

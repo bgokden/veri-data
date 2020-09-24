@@ -23,12 +23,12 @@ func TestData(t *testing.T) {
 	dt, err := data.NewData("data1", dir)
 	assert.Nil(t, err)
 	defer dt.Close()
-	datum := data.NewDatum([]float64{0.1, 0.2, 0.3}, 3, 0, 1, 0, "a", "a", 0)
+	datum := data.NewDatum([]float64{0.1, 0.2, 0.3}, 3, 0, 1, 0, "a", []byte("a"), 0)
 	log.Printf("datum %v\n", datum)
 	err = dt.Insert(datum)
-	datum2 := data.NewDatum([]float64{0.2, 0.3, 0.4}, 3, 0, 1, 0, "b", "b", 0)
+	datum2 := data.NewDatum([]float64{0.2, 0.3, 0.4}, 3, 0, 1, 0, "b", []byte("b"), 0)
 	err = dt.Insert(datum2)
-	datum3 := data.NewDatum([]float64{0.2, 0.3, 0.7}, 3, 0, 1, 0, "c", "c", 0)
+	datum3 := data.NewDatum([]float64{0.2, 0.3, 0.7}, 3, 0, 1, 0, "c", []byte("c"), 0)
 	err = dt.Insert(datum3)
 	for i := 0; i < 5; i++ {
 		dt.Process(true)
@@ -73,7 +73,7 @@ func load_data_from_json(dt *data.Data, fname string) (*data.Datum, error) {
 		if err := json.Unmarshal(s.Bytes(), &v); err != nil {
 			return nil, err
 		}
-		datum := data.NewDatum(v.Embedding, uint32(len(v.Embedding)), 0, 1, 0, v.Title, v.Title, 0)
+		datum := data.NewDatum(v.Embedding, uint32(len(v.Embedding)), 0, 1, 0, v.Title, []byte(v.Title), 0)
 		if oneDatum == nil && index == count {
 			oneDatum = datum
 		} else {
@@ -120,5 +120,5 @@ func TestData2(t *testing.T) {
 	}
 	assert.Equal(t, opt2.Limit, uint32(len(list)))
 
-	assert.Equal(t, "Every outfit Duchess Kate has worn in 2019", list[1].Datum.Value.Label)
+	assert.Equal(t, []byte("Every outfit Duchess Kate has worn in 2019"), list[1].Datum.Value.Label)
 }
