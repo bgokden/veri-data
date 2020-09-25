@@ -154,6 +154,12 @@ func (dt *Data) StreamSearch(datum *Datum, scoredDatumStreamInput <-chan *Scored
 
 	defer temp.Close()
 
+	localCollector := dt.Search(datum, options...)
+
+	for _, i := range localCollector.List {
+		temp.Insert(i.Datum)
+	}
+
 	for i := range scoredDatumStreamInput {
 		temp.Insert(i.Datum)
 	}
