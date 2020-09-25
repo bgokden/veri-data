@@ -24,6 +24,11 @@ type LimitOption struct {
 	Limit uint32
 }
 
+// TimeLimitOption is a search option for limit number of results
+type TimeLimitOption struct {
+	Duration time.Duration
+}
+
 // Collector collects results
 type Collector struct {
 	List           []*ScoredDatum
@@ -38,6 +43,11 @@ type Collector struct {
 type ScoredDatum struct {
 	Datum *Datum
 	Score float64
+}
+
+// Searchable structs support search interface
+type Searchable interface {
+	StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error
 }
 
 // Insert add a new scored datum to collector
@@ -151,11 +161,6 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) *Collector {
 	return c
 }
 
-// Searchable structs support search interface
-type Searchable interface {
-	StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error
-}
-
 // StreamSearch does a search based on distances of keys
 func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error {
 	collector := dt.Search(datum, options...)
@@ -168,6 +173,14 @@ func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum
 
 // SuperSearch searches and merges other resources
 func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *ScoredDatum, sources []Searchable, options ...SearchOption) error {
+	duration := time.Duration(1) * time.Second
+	for _, val := range options {
+		switch v := val.(type) {
+		case TimeLimitOption:
+			duration = v.Duration
+		}
+	}
+	timeLimit := time.After(duration)
 	// Search Start
 	scoredDatumStream := make(chan *ScoredDatum, 100)
 	var queryWaitGroup sync.WaitGroup
@@ -190,7 +203,6 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 	temp, _ := NewTempData("...")
 	defer temp.Close()
 	dataAvailable := true
-	timeLimit := time.After(time.Duration(1000) * time.Millisecond)
 	for dataAvailable {
 		select {
 		case scoredDatum := <-scoredDatumStream:
