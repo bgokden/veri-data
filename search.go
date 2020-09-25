@@ -183,6 +183,7 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 	}()
 	// external
 	for _, source := range sources {
+		queryWaitGroup.Add(1)
 		source.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
 	}
 	// stream merge

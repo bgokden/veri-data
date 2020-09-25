@@ -129,55 +129,34 @@ func TestDataStreamSearch(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer os.RemoveAll(dir) // clean up
 
-	dt, err := data.NewData("data2", dir)
+	dt01, err := data.NewData("data01", dir)
 	assert.Nil(t, err)
-	defer dt.Close()
+	defer dt01.Close()
 
-	datum, err := load_data_from_json(dt, "./testdata/news_title_embdeddings.json")
+	datum, err := load_data_from_json(dt01, "./testdata/news_title_embdeddings.json")
 	assert.Nil(t, err)
 
-	for i := 0; i < 5; i++ {
-		dt.Process(true)
-	}
-	log.Printf("stats %v\n", dt.GetStats().N)
+	dt02, err := data.NewData("data02", dir)
+	assert.Nil(t, err)
+	defer dt02.Close()
 
-	log.Printf("label: %v\n", datum.Value.Label)
+	_, err = load_data_from_json(dt02, "./testdata/news_title_embdeddings.json")
+	assert.Nil(t, err)
+
 	opt := data.ScoreFuncOption{}
 	opt.ScoreFunc = data.VectorMultiplication
 	opt.HigherIsBetter = true
 	opt2 := data.LimitOption{
 		Limit: 10,
 	}
-	collector := dt.Search(datum, opt, opt2)
-	for _, e := range collector.List {
+	scoredDatumStream := make(chan *data.ScoredDatum, 100)
+	err = dt01.SuperSearch(datum, scoredDatumStream, []data.Searchable{dt02}, opt, opt2)
+	assert.Nil(t, err)
+	time.Sleep(1 * time.Second)
+	close(scoredDatumStream)
+	for e := range scoredDatumStream {
 		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
 	}
-	assert.Equal(t, opt2.Limit, uint32(len(collector.List)))
-
-	assert.Equal(t, []byte("Every outfit Duchess Kate has worn in 2019"), collector.List[1].Datum.Value.Label)
-
-	channelInput := make(chan *data.ScoredDatum)
-
-	var collector2 *data.Collector
-	go func() {
-		collector2 = dt.StreamSearch(datum, channelInput, opt, opt2)
-	}()
-
-	for _, e := range collector.List {
-		channelInput <- e
-	}
-	close(channelInput)
-
-	for collector2 == nil {
-		time.Sleep(100 * time.Millisecond)
-	}
-	for _, e := range collector2.List {
-		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
-	}
-
-	assert.Equal(t, []byte("Every outfit Duchess Kate has worn in 2019"), collector2.List[1].Datum.Value.Label)
-
 }
