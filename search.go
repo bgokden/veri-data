@@ -23,7 +23,7 @@ type LimitOption struct {
 
 // Collector collects results
 type Collector struct {
-	List           []ScoredDatum
+	List           []*ScoredDatum
 	ScoreFunc      func(arr1 []float64, arr2 []float64) float64
 	MaxScore       float64
 	DatumKey       *DatumKey
@@ -37,6 +37,31 @@ type ScoredDatum struct {
 	Score float64
 }
 
+// Insert add a new scored datum to collector
+func (c *Collector) Insert(scoredDatum *ScoredDatum) error {
+	itemAdded := false
+	if uint32(len(c.List)) < c.N {
+		c.List = append(c.List, scoredDatum)
+		itemAdded = true
+	} else if (c.HigherIsBetter && scoredDatum.Score > c.List[len(c.List)-1].Score) ||
+		(!c.HigherIsBetter && scoredDatum.Score < c.List[len(c.List)-1].Score) {
+		c.List[len(c.List)-1] = scoredDatum
+		itemAdded = true
+	}
+	if itemAdded {
+		if c.HigherIsBetter {
+			sort.Slice(c.List, func(i, j int) bool {
+				return c.List[i].Score > c.List[j].Score
+			})
+		} else {
+			sort.Slice(c.List, func(i, j int) bool {
+				return c.List[i].Score < c.List[j].Score
+			})
+		}
+	}
+	return nil
+}
+
 // Senc collects the results
 func (c *Collector) Send(list *bpb.KVList) error {
 	itemAdded := false
@@ -45,7 +70,7 @@ func (c *Collector) Send(list *bpb.KVList) error {
 		score := c.ScoreFunc(datumKey.Feature, c.DatumKey.Feature)
 		if uint32(len(c.List)) < c.N {
 			datum, _ := ToDatum(item.Key, item.Value)
-			scoredDatum := ScoredDatum{
+			scoredDatum := &ScoredDatum{
 				Datum: datum,
 				Score: score,
 			}
@@ -54,7 +79,7 @@ func (c *Collector) Send(list *bpb.KVList) error {
 		} else if (c.HigherIsBetter && score > c.List[len(c.List)-1].Score) ||
 			(!c.HigherIsBetter && score < c.List[len(c.List)-1].Score) {
 			datum, _ := ToDatum(item.Key, item.Value)
-			scoredDatum := ScoredDatum{
+			scoredDatum := &ScoredDatum{
 				Datum: datum,
 				Score: score,
 			}
@@ -78,7 +103,7 @@ func (c *Collector) Send(list *bpb.KVList) error {
 }
 
 // Search does a search based on distances of keys
-func (dt *Data) Search(datum *Datum, options ...SearchOption) []ScoredDatum {
+func (dt *Data) Search(datum *Datum, options ...SearchOption) *Collector {
 	c := &Collector{}
 	c.ScoreFunc = VectorDistance
 	c.DatumKey = datum.Key
@@ -120,5 +145,20 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) []ScoredDatum {
 		return nil
 	}
 	// Done.
-	return c.List
+	return c
+}
+
+// Search does a search based on distances of keys
+func (dt *Data) MultiStreamSearch(datumList []*Datum, scoredDatumStreamInput <-chan *ScoredDatum, scoredDatumStreamOutput chan<- *ScoredDatum, options ...SearchOption) error {
+	datum := datumList[0] // for one
+	collector := dt.Search(datum, options)
+
+	for i := range scoredDatumStreamInput {
+		collector.Insert(i)
+	}
+
+	for _, scoredDatum := range collector.List {
+		scoredDatumStreamOutput <- scoredDatum
+	}
+	return nil
 }

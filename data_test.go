@@ -37,18 +37,18 @@ func TestData(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	list := dt.Search(datum)
+	collector := dt.Search(datum)
 
-	for _, e := range list {
+	for _, e := range collector.List {
 		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
 	}
 
 	opt := data.ScoreFuncOption{}
 	opt.ScoreFunc = data.VectorMultiplication
 	opt.HigherIsBetter = true
-	list2 := dt.Search(datum, opt)
+	collector2 := dt.Search(datum, opt)
 
-	for _, e := range list2 {
+	for _, e := range collector2.List {
 		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
 	}
 
@@ -114,11 +114,11 @@ func TestData2(t *testing.T) {
 	opt2 := data.LimitOption{
 		Limit: 10,
 	}
-	list := dt.Search(datum, opt, opt2)
-	for _, e := range list {
+	collector := dt.Search(datum, opt, opt2)
+	for _, e := range collector.List {
 		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
 	}
-	assert.Equal(t, opt2.Limit, uint32(len(list)))
+	assert.Equal(t, opt2.Limit, uint32(len(collector.List)))
 
-	assert.Equal(t, []byte("Every outfit Duchess Kate has worn in 2019"), list[1].Datum.Value.Label)
+	assert.Equal(t, []byte("Every outfit Duchess Kate has worn in 2019"), collector.List[1].Datum.Value.Label)
 }

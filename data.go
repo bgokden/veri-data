@@ -61,6 +61,19 @@ func NewData(name, path string) (*Data, error) {
 	return dt, nil
 }
 
+// NewTempData return an inmemory badger instance
+func NewTempData(name string) (*Data, error) {
+	dt := &Data{
+		Name: name,
+	}
+	db, err := badger.Open(badger.DefaultOptions("").WithInMemory(true))
+	if err != nil {
+		return nil, err
+	}
+	dt.DB = db
+	return dt, nil
+}
+
 // Close currently closes underlying kv store
 func (dt *Data) Close() error {
 	return dt.DB.Close()
