@@ -148,17 +148,17 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) *Collector {
 	return c
 }
 
-// Search does a search based on distances of keys
-func (dt *Data) MultiStreamSearch(datumList []*Datum, scoredDatumStreamInput <-chan *ScoredDatum, scoredDatumStreamOutput chan<- *ScoredDatum, options ...SearchOption) error {
-	datum := datumList[0] // for one
-	collector := dt.Search(datum, options)
+// StreamSearch does a search based on distances of keys
+func (dt *Data) StreamSearch(datum *Datum, scoredDatumStreamInput <-chan *ScoredDatum, options ...SearchOption) *Collector {
+	temp, _ := NewTempData("...")
+
+	defer temp.Close()
 
 	for i := range scoredDatumStreamInput {
-		collector.Insert(i)
+		temp.Insert(i.Datum)
 	}
 
-	for _, scoredDatum := range collector.List {
-		scoredDatumStreamOutput <- scoredDatum
-	}
-	return nil
+	collector := temp.Search(datum, options...)
+	// defer close may cause problem if this two lines merged
+	return collector
 }
