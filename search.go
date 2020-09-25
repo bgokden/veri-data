@@ -2,7 +2,10 @@ package data
 
 import (
 	"context"
+	"log"
 	"sort"
+	"sync"
+	"time"
 
 	bpb "github.com/dgraph-io/badger/v2/pb"
 )
@@ -148,23 +151,67 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) *Collector {
 	return c
 }
 
+// Searchable structs support search interface
+type Searchable interface {
+	StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error
+}
+
 // StreamSearch does a search based on distances of keys
-func (dt *Data) StreamSearch(datum *Datum, scoredDatumStreamInput <-chan *ScoredDatum, options ...SearchOption) *Collector {
+func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error {
+	collector := dt.Search(datum, options...)
+	for _, i := range collector.List {
+		scoredDatumStream <- i
+	}
+	queryWaitGroup.Done()
+	return nil
+}
+
+// SuperSearch searches and merges other resources
+func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *ScoredDatum, sources []Searchable, options ...SearchOption) error {
+	// Search Start
+	scoredDatumStream := make(chan *ScoredDatum, 100)
+	var queryWaitGroup sync.WaitGroup
+	waitChannel := make(chan struct{})
+	go func() {
+		defer close(waitChannel)
+		queryWaitGroup.Wait()
+	}()
+	// internal
+	queryWaitGroup.Add(1)
+	go func() {
+		dt.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
+	}()
+	// external
+	for _, source := range sources {
+		source.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
+	}
+	// stream merge
 	temp, _ := NewTempData("...")
-
 	defer temp.Close()
-
-	localCollector := dt.Search(datum, options...)
-
-	for _, i := range localCollector.List {
-		temp.Insert(i.Datum)
+	dataAvailable := true
+	timeLimit := time.After(time.Duration(1000) * time.Millisecond)
+	for dataAvailable {
+		select {
+		case scoredDatum := <-scoredDatumStream:
+			temp.Insert(scoredDatum.Datum)
+		case <-waitChannel:
+			log.Printf("all data finished")
+			close(scoredDatumStream)
+			for scoredDatum := range scoredDatumStream {
+				temp.Insert(scoredDatum.Datum)
+			}
+			dataAvailable = false
+			break
+		case <-timeLimit:
+			log.Printf("timeout")
+			dataAvailable = false
+			break
+		}
 	}
-
-	for i := range scoredDatumStreamInput {
-		temp.Insert(i.Datum)
-	}
-
+	// Search End
 	collector := temp.Search(datum, options...)
-	// defer close may cause problem if this two lines merged
-	return collector
+	for _, i := range collector.List {
+		scoredDatumStreamOutput <- i
+	}
+	return nil
 }
