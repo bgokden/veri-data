@@ -152,7 +152,8 @@ func TestDataStreamSearch(t *testing.T) {
 		Limit: 10,
 	}
 	scoredDatumStream := make(chan *data.ScoredDatum, 100)
-	err = dt01.SuperSearch(datum, scoredDatumStream, []data.Searchable{dt02}, opt, opt2)
+	dt01.AddSource(dt02)
+	err = dt01.SuperSearch(datum, scoredDatumStream, opt, opt2)
 	assert.Nil(t, err)
 	time.Sleep(1 * time.Second)
 	close(scoredDatumStream)

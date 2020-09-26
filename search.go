@@ -172,7 +172,7 @@ func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum
 }
 
 // SuperSearch searches and merges other resources
-func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *ScoredDatum, sources []Searchable, options ...SearchOption) error {
+func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *ScoredDatum, options ...SearchOption) error {
 	duration := time.Duration(1) * time.Second
 	for _, val := range options {
 		switch v := val.(type) {
@@ -195,7 +195,9 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 		dt.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
 	}()
 	// external
-	for _, source := range sources {
+	sourceList := dt.Sources.Items()
+	for _, sourceItem := range sourceList {
+		source := sourceItem.Object.(DataSource)
 		queryWaitGroup.Add(1)
 		source.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
 	}
