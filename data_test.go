@@ -24,12 +24,12 @@ func TestData(t *testing.T) {
 	dt, err := data.NewData("data1", dir)
 	assert.Nil(t, err)
 	defer dt.Close()
-	datum := data.NewDatum([]float64{0.1, 0.2, 0.3}, 3, 0, 1, 0, "a", []byte("a"), 0)
+	datum := data.NewDatum([]float64{0.1, 0.2, 0.3}, 3, 0, 1, 0, []byte("a"), []byte("a"), 0)
 	log.Printf("datum %v\n", datum)
 	err = dt.Insert(datum)
-	datum2 := data.NewDatum([]float64{0.2, 0.3, 0.4}, 3, 0, 1, 0, "b", []byte("b"), 0)
+	datum2 := data.NewDatum([]float64{0.2, 0.3, 0.4}, 3, 0, 1, 0, []byte("b"), []byte("b"), 0)
 	err = dt.Insert(datum2)
-	datum3 := data.NewDatum([]float64{0.2, 0.3, 0.7}, 3, 0, 1, 0, "c", []byte("c"), 0)
+	datum3 := data.NewDatum([]float64{0.2, 0.3, 0.7}, 3, 0, 1, 0, []byte("c"), []byte("c"), 0)
 	err = dt.Insert(datum3)
 	for i := 0; i < 5; i++ {
 		dt.Process(true)
@@ -41,7 +41,7 @@ func TestData(t *testing.T) {
 	collector := dt.Search(datum)
 
 	for _, e := range collector.List {
-		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
+		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
 	}
 
 	opt := data.ScoreFuncOption{}
@@ -50,7 +50,7 @@ func TestData(t *testing.T) {
 	collector2 := dt.Search(datum, opt)
 
 	for _, e := range collector2.List {
-		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
+		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
 	}
 
 }
@@ -74,7 +74,7 @@ func load_data_from_json(dt *data.Data, fname string) (*data.Datum, error) {
 		if err := json.Unmarshal(s.Bytes(), &v); err != nil {
 			return nil, err
 		}
-		datum := data.NewDatum(v.Embedding, uint32(len(v.Embedding)), 0, 1, 0, v.Title, []byte(v.Title), 0)
+		datum := data.NewDatum(v.Embedding, uint32(len(v.Embedding)), 0, 1, 0, []byte(v.Title), []byte(v.Title), 0)
 		if oneDatum == nil && index == count {
 			oneDatum = datum
 		} else {

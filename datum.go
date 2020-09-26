@@ -19,7 +19,7 @@ type DatumKey struct {
 	Dim2       uint32
 	Size1      uint32
 	Size2      uint32
-	GroupLabel string
+	GroupLabel []byte
 }
 
 // DatumValue is value of a Datum
@@ -34,7 +34,7 @@ func NewDatum(feature []float64,
 	dim2 uint32,
 	size1 uint32,
 	size2 uint32,
-	groupLabel string,
+	groupLabel []byte,
 	label []byte,
 	version int64,
 ) *Datum {

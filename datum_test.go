@@ -8,7 +8,7 @@ import (
 )
 
 func TestDatum(t *testing.T) {
-	datum := data.NewDatum([]float64{0.1, 0.2, 0.3}, 3, 0, 1, 0, "a", []byte("a"), 0)
+	datum := data.NewDatum([]float64{0.1, 0.2, 0.3}, 3, 0, 1, 0, []byte("a"), []byte("a"), 0)
 
 	keyByte, err := datum.GetKey()
 	assert.Nil(t, err)
