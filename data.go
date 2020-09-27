@@ -73,6 +73,40 @@ func NewData(name, path string) (*Data, error) {
 	return dt, nil
 }
 
+// NewPreData creates a data struct
+func NewPreData(name, path string) *Data {
+	dt := &Data{
+		Name: name,
+	}
+	log.Printf("Create Data\n")
+	dt.DBPath = fmt.Sprintf("%v/%v", path, name)
+	return dt
+}
+
+func (dt *Data) InitData() error {
+	log.Printf("Create Data\n")
+	db, err := badger.Open(badger.DefaultOptions(dt.DBPath))
+	if err != nil {
+		return err
+	}
+	dt.DB = db
+	dt.Sources = cache.New(5*time.Minute, 10*time.Minute)
+	go dt.Run()
+	go func() {
+		sigint := make(chan os.Signal, 1)
+
+		// interrupt signal sent from terminal
+		signal.Notify(sigint, os.Interrupt)
+		// sigterm signal sent from orchastrator
+		signal.Notify(sigint, syscall.SIGTERM)
+
+		<-sigint
+
+		dt.Close()
+	}()
+	return nil
+}
+
 // NewTempData return an inmemory badger instance
 func NewTempData(name string) (*Data, error) {
 	dt := &Data{
