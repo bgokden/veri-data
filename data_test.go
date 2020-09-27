@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -160,4 +161,30 @@ func TestDataStreamSearch(t *testing.T) {
 	for e := range scoredDatumStream {
 		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
 	}
+	rand.Seed(42)
+	datumStream := make(chan *data.Datum, 100)
+	err = dt01.StreamSample(datumStream, 0.5)
+	assert.Nil(t, err)
+	time.Sleep(1 * time.Second)
+	close(datumStream)
+	log.Printf("Stream Sample\n")
+	count := 0
+	for e := range datumStream {
+		log.Printf("label %v: %v\n", count, string(e.Value.Label))
+		count++
+	}
+	assert.Equal(t, 24, count)
+
+	datumStreamAll := make(chan *data.Datum, 100)
+	err = dt01.StreamAll(datumStreamAll)
+	assert.Nil(t, err)
+	time.Sleep(1 * time.Second)
+	close(datumStreamAll)
+	log.Printf("Stream All\n")
+	countAll := 0
+	for e := range datumStreamAll {
+		log.Printf("label %v: %v\n", countAll, string(e.Value.Label))
+		countAll++
+	}
+	assert.Equal(t, 49, countAll)
 }

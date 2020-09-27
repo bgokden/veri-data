@@ -199,7 +199,7 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 	for _, sourceItem := range sourceList {
 		source := sourceItem.Object.(DataSource)
 		queryWaitGroup.Add(1)
-		source.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
+		go source.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
 	}
 	// stream merge
 	temp, _ := NewTempData("...")
