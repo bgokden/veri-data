@@ -33,6 +33,7 @@ type Data struct {
 	DBPath      string
 	Dirty       bool
 	Sources     *cache.Cache
+	QueryCache  *cache.Cache
 }
 
 // Stats to share about data
@@ -57,6 +58,7 @@ func NewData(name, path string) (*Data, error) {
 	}
 	dt.DB = db
 	dt.Sources = cache.New(5*time.Minute, 10*time.Minute)
+	dt.QueryCache = cache.New(5*time.Minute, 10*time.Minute)
 	go dt.Run()
 	go func() {
 		sigint := make(chan os.Signal, 1)

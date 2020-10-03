@@ -8,6 +8,7 @@ import (
 	"time"
 
 	bpb "github.com/dgraph-io/badger/v2/pb"
+	"github.com/patrickmn/go-cache"
 )
 
 // SearchOption is an interface for search options
@@ -29,6 +30,10 @@ type TimeLimitOption struct {
 	Duration time.Duration
 }
 
+type SignatureOption struct {
+	Value []byte
+}
+
 // Collector collects results
 type Collector struct {
 	List           []*ScoredDatum
@@ -43,11 +48,6 @@ type Collector struct {
 type ScoredDatum struct {
 	Datum *Datum
 	Score float64
-}
-
-// Searchable structs support search interface
-type Searchable interface {
-	StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error
 }
 
 // Insert add a new scored datum to collector
@@ -171,16 +171,35 @@ func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum
 	return nil
 }
 
+func GetSearchKey(datum *Datum, signature []byte) string {
+	keyByte, err := datum.GetKey()
+	if err != nil {
+		return string(signature)
+	}
+	return string(append(keyByte, signature...))
+}
+
 // SuperSearch searches and merges other resources
 func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *ScoredDatum, options ...SearchOption) error {
 	duration := time.Duration(1) * time.Second
+	signature := []byte("default")
 	for _, val := range options {
 		switch v := val.(type) {
 		case TimeLimitOption:
 			duration = v.Duration
+		case SignatureOption:
+			signature = v.Value
 		}
 	}
 	timeLimit := time.After(duration)
+	queryKey := GetSearchKey(datum, signature)
+	if result, ok := dt.QueryCache.Get(queryKey); ok {
+		cachedCollector := result.(*Collector)
+		for _, i := range cachedCollector.List {
+			scoredDatumStreamOutput <- i
+		}
+		return nil
+	}
 	// Search Start
 	scoredDatumStream := make(chan *ScoredDatum, 100)
 	var queryWaitGroup sync.WaitGroup
@@ -228,5 +247,6 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 	for _, i := range collector.List {
 		scoredDatumStreamOutput <- i
 	}
+	dt.QueryCache.Set(queryKey, collector, cache.DefaultExpiration)
 	return nil
 }
