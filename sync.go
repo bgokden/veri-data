@@ -27,7 +27,11 @@ func (dt *Data) Sync(source DataSource, waitGroup *sync.WaitGroup) error {
 	diff := (localN - stats.N) / 2
 	if diff > 0 {
 		datumStream := make(chan *Datum, 100)
-		go source.StreamInsert(datumStream)
+		go func() {
+			for datum := range datumStream {
+				source.Insert(datum, nil)
+			}
+		}()
 		dt.StreamSample(datumStream, float64(diff)/float64(localN))
 		close(datumStream)
 	}

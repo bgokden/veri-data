@@ -214,12 +214,12 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 	for dataAvailable {
 		select {
 		case scoredDatum := <-scoredDatumStream:
-			temp.Insert(scoredDatum.Datum)
+			temp.Insert(scoredDatum.Datum, nil)
 		case <-waitChannel:
 			log.Printf("all data finished")
 			close(scoredDatumStream)
 			for scoredDatum := range scoredDatumStream {
-				temp.Insert(scoredDatum.Datum)
+				temp.Insert(scoredDatum.Datum, nil)
 			}
 			dataAvailable = false
 			break

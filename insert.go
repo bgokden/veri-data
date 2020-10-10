@@ -6,22 +6,20 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 )
 
-// InsertOption is an interface for insertion options
-type InsertOption interface{}
+type InsertConfig struct {
+	TTL time.Duration
+}
 
-// TTLOption is an insertion option for ttl
-type TTLOption struct {
-	Duration time.Duration
+type InsertDatumWithConfig struct {
+	Config *InsertConfig
+	Datum  *Datum
 }
 
 // Insert inserts data to internal kv store
-func (dt *Data) Insert(datum *Datum, options ...InsertOption) error {
+func (dt *Data) Insert(datum *Datum, config *InsertConfig) error {
 	var ttlDuration *time.Duration
-	for _, val := range options {
-		switch v := val.(type) {
-		case TTLOption:
-			ttlDuration = &v.Duration
-		}
+	if config != nil {
+		ttlDuration = &config.TTL
 	}
 	keyByte, err := datum.GetKey()
 	if err != nil {
@@ -45,9 +43,9 @@ func (dt *Data) Insert(datum *Datum, options ...InsertOption) error {
 }
 
 // StreamInsert inserts data in stream
-func (dt *Data) StreamInsert(datumStream <-chan *Datum, options ...InsertOption) error {
+func (dt *Data) StreamInsert(datumStream <-chan *InsertDatumWithConfig) error {
 	for e := range datumStream {
-		dt.Insert(e, options...)
+		dt.Insert(e.Datum, e.Config)
 	}
 	return nil
 }
