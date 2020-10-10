@@ -14,7 +14,7 @@ import (
 )
 
 type DataSource interface {
-	StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error
+	StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, config *SearchConfig) error
 	StreamInsert(datumStream <-chan *Datum, options ...InsertOption) error
 	Insert(datum *Datum, options ...InsertOption) error
 	GetStats() *Stats

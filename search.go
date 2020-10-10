@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"sort"
 	"sync"
@@ -11,27 +12,27 @@ import (
 	"github.com/patrickmn/go-cache"
 )
 
-// SearchOption is an interface for search options
-type SearchOption interface{}
-
-// ScoreFuncOption is a search option for custom search functions
-type ScoreFuncOption struct {
-	ScoreFunc      func(arr1 []float64, arr2 []float64) float64
-	HigherIsBetter bool
+type SearchConfig struct {
+	ScoreFuncName  string                                       `json:"scoreFuncName"`
+	ScoreFunc      func(arr1 []float64, arr2 []float64) float64 `json:"-"`
+	HigherIsBetter bool                                         `json:"higherIsBetter"`
+	Limit          uint32                                       `json:"limit"`
+	Duration       time.Duration                                `json:"-"`
 }
 
-// LimitOption is a search option for limit number of results
-type LimitOption struct {
-	Limit uint32
+func DefaulSearchConfig() *SearchConfig {
+	return &SearchConfig{
+		ScoreFuncName:  "VectorDistance",
+		ScoreFunc:      VectorDistance,
+		HigherIsBetter: false,
+		Limit:          10,
+		Duration:       1 * time.Second,
+	}
 }
 
-// TimeLimitOption is a search option for limit number of results
-type TimeLimitOption struct {
-	Duration time.Duration
-}
-
-type SignatureOption struct {
-	Value []byte
+func EncodeSearchConfig(p *SearchConfig) []byte {
+	marshalled, _ := json.Marshal(p)
+	return marshalled
 }
 
 // Collector collects results
@@ -116,21 +117,15 @@ func (c *Collector) Send(list *bpb.KVList) error {
 }
 
 // Search does a search based on distances of keys
-func (dt *Data) Search(datum *Datum, options ...SearchOption) *Collector {
-	c := &Collector{}
-	c.ScoreFunc = VectorDistance
-	c.DatumKey = datum.Key
-	c.HigherIsBetter = false
-	c.N = 10
-	for _, val := range options {
-		switch v := val.(type) {
-		case ScoreFuncOption:
-			c.ScoreFunc = v.ScoreFunc
-			c.HigherIsBetter = v.HigherIsBetter
-		case LimitOption:
-			c.N = v.Limit
-		}
+func (dt *Data) Search(datum *Datum, config *SearchConfig) *Collector {
+	if config == nil {
+		config = DefaulSearchConfig()
 	}
+	c := &Collector{}
+	c.DatumKey = datum.Key
+	c.ScoreFunc = config.ScoreFunc
+	c.HigherIsBetter = config.HigherIsBetter
+	c.N = config.Limit
 	stream := dt.DB.NewStream()
 	// db.NewStreamAt(readTs) for managed mode.
 
@@ -162,8 +157,8 @@ func (dt *Data) Search(datum *Datum, options ...SearchOption) *Collector {
 }
 
 // StreamSearch does a search based on distances of keys
-func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, options ...SearchOption) error {
-	collector := dt.Search(datum, options...)
+func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum, queryWaitGroup *sync.WaitGroup, config *SearchConfig) error {
+	collector := dt.Search(datum, config)
 	for _, i := range collector.List {
 		scoredDatumStream <- i
 	}
@@ -171,8 +166,9 @@ func (dt *Data) StreamSearch(datum *Datum, scoredDatumStream chan<- *ScoredDatum
 	return nil
 }
 
-func GetSearchKey(datum *Datum, signature []byte) string {
+func GetSearchKey(datum *Datum, config *SearchConfig) string {
 	keyByte, err := datum.GetKey()
+	signature := EncodeSearchConfig(config)
 	if err != nil {
 		return string(signature)
 	}
@@ -180,19 +176,10 @@ func GetSearchKey(datum *Datum, signature []byte) string {
 }
 
 // SuperSearch searches and merges other resources
-func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *ScoredDatum, options ...SearchOption) error {
-	duration := time.Duration(1) * time.Second
-	signature := []byte("default")
-	for _, val := range options {
-		switch v := val.(type) {
-		case TimeLimitOption:
-			duration = v.Duration
-		case SignatureOption:
-			signature = v.Value
-		}
-	}
+func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *ScoredDatum, config *SearchConfig) error {
+	duration := config.Duration
 	timeLimit := time.After(duration)
-	queryKey := GetSearchKey(datum, signature)
+	queryKey := GetSearchKey(datum, config)
 	if result, ok := dt.QueryCache.Get(queryKey); ok {
 		cachedCollector := result.(*Collector)
 		for _, i := range cachedCollector.List {
@@ -211,14 +198,14 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 	// internal
 	queryWaitGroup.Add(1)
 	go func() {
-		dt.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
+		dt.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, config)
 	}()
 	// external
 	sourceList := dt.Sources.Items()
 	for _, sourceItem := range sourceList {
 		source := sourceItem.Object.(DataSource)
 		queryWaitGroup.Add(1)
-		go source.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, options...)
+		go source.StreamSearch(datum, scoredDatumStream, &queryWaitGroup, config)
 	}
 	// stream merge
 	temp, _ := NewTempData("...")
@@ -243,7 +230,7 @@ func (dt *Data) SuperSearch(datum *Datum, scoredDatumStreamOutput chan<- *Scored
 		}
 	}
 	// Search End
-	collector := temp.Search(datum, options...)
+	collector := temp.Search(datum, config)
 	for _, i := range collector.List {
 		scoredDatumStreamOutput <- i
 	}

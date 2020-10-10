@@ -39,16 +39,16 @@ func TestData(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	collector := dt.Search(datum)
+	collector := dt.Search(datum, nil)
 
 	for _, e := range collector.List {
 		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
 	}
 
-	opt := data.ScoreFuncOption{}
-	opt.ScoreFunc = data.VectorMultiplication
-	opt.HigherIsBetter = true
-	collector2 := dt.Search(datum, opt)
+	config := data.DefaulSearchConfig()
+	config.ScoreFunc = data.VectorMultiplication
+	config.HigherIsBetter = true
+	collector2 := dt.Search(datum, config)
 
 	for _, e := range collector2.List {
 		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
@@ -110,17 +110,15 @@ func TestData2(t *testing.T) {
 	log.Printf("stats %v\n", dt.GetStats().N)
 
 	log.Printf("label: %v\n", datum.Value.Label)
-	opt := data.ScoreFuncOption{}
-	opt.ScoreFunc = data.VectorMultiplication
-	opt.HigherIsBetter = true
-	opt2 := data.LimitOption{
-		Limit: 10,
-	}
-	collector := dt.Search(datum, opt, opt2)
+	config := data.DefaulSearchConfig()
+	config.ScoreFunc = data.VectorMultiplication
+	config.HigherIsBetter = true
+	config.Limit = 10
+	collector := dt.Search(datum, config)
 	for _, e := range collector.List {
 		log.Printf("label: %v score: %v\n", e.Datum.Value.Label, e.Score)
 	}
-	assert.Equal(t, opt2.Limit, uint32(len(collector.List)))
+	assert.Equal(t, config.Limit, uint32(len(collector.List)))
 
 	assert.Equal(t, []byte("Every outfit Duchess Kate has worn in 2019"), collector.List[1].Datum.Value.Label)
 }
@@ -146,15 +144,13 @@ func TestDataStreamSearch(t *testing.T) {
 	_, err = load_data_from_json(dt02, "./testdata/news_title_embdeddings.json")
 	assert.Nil(t, err)
 
-	opt := data.ScoreFuncOption{}
-	opt.ScoreFunc = data.VectorMultiplication
-	opt.HigherIsBetter = true
-	opt2 := data.LimitOption{
-		Limit: 10,
-	}
+	config := data.DefaulSearchConfig()
+	config.ScoreFunc = data.VectorMultiplication
+	config.HigherIsBetter = true
+	config.Limit = 10
 	scoredDatumStream := make(chan *data.ScoredDatum, 100)
 	dt01.AddSource(dt02)
-	err = dt01.SuperSearch(datum, scoredDatumStream, opt, opt2)
+	err = dt01.SuperSearch(datum, scoredDatumStream, config)
 	assert.Nil(t, err)
 	time.Sleep(1 * time.Second)
 	close(scoredDatumStream)

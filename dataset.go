@@ -31,6 +31,14 @@ func (dts *Dataset) Get(name string) (*Data, error) {
 	return nil, errors.Errorf("Data %v is currupt", name)
 }
 
+func (dts *Dataset) GetOrCreateIfNotExists(name string) (*Data, error) {
+	err := dts.CreateIfNotExists(name)
+	if err == nil {
+		return nil, err
+	}
+	return dts.Get(name)
+}
+
 func (dts *Dataset) CreateIfNotExists(name string) error {
 	preData := NewPreData(name, dts.Path)
 	err := dts.DataList.Add(name, preData, cache.NoExpiration)
