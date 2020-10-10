@@ -45,7 +45,7 @@ func TestData(t *testing.T) {
 		log.Printf("label: %v score: %v\n", string(e.Datum.Value.Label), e.Score)
 	}
 
-	config := data.DefaulSearchConfig()
+	config := data.DefaultSearchConfig()
 	config.ScoreFunc = data.VectorMultiplication
 	config.HigherIsBetter = true
 	collector2 := dt.Search(datum, config)
@@ -110,7 +110,7 @@ func TestData2(t *testing.T) {
 	log.Printf("stats %v\n", dt.GetStats().N)
 
 	log.Printf("label: %v\n", datum.Value.Label)
-	config := data.DefaulSearchConfig()
+	config := data.DefaultSearchConfig()
 	config.ScoreFunc = data.VectorMultiplication
 	config.HigherIsBetter = true
 	config.Limit = 10
@@ -144,7 +144,7 @@ func TestDataStreamSearch(t *testing.T) {
 	_, err = load_data_from_json(dt02, "./testdata/news_title_embdeddings.json")
 	assert.Nil(t, err)
 
-	config := data.DefaulSearchConfig()
+	config := data.DefaultSearchConfig()
 	config.ScoreFunc = data.VectorMultiplication
 	config.HigherIsBetter = true
 	config.Limit = 10

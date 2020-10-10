@@ -20,7 +20,7 @@ type SearchConfig struct {
 	Duration       time.Duration                                `json:"-"`
 }
 
-func DefaulSearchConfig() *SearchConfig {
+func DefaultSearchConfig() *SearchConfig {
 	return &SearchConfig{
 		ScoreFuncName:  "VectorDistance",
 		ScoreFunc:      VectorDistance,
@@ -119,7 +119,7 @@ func (c *Collector) Send(list *bpb.KVList) error {
 // Search does a search based on distances of keys
 func (dt *Data) Search(datum *Datum, config *SearchConfig) *Collector {
 	if config == nil {
-		config = DefaulSearchConfig()
+		config = DefaultSearchConfig()
 	}
 	c := &Collector{}
 	c.DatumKey = datum.Key
